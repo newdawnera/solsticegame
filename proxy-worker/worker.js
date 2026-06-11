@@ -1,20 +1,17 @@
 /**
  * The Longest Night — AI proxy (Cloudflare Worker)
  *
- * Holds the Gemini API key server-side so the game never ships a key.
+ * Holds the Gemini API key server-side so the client never ships one.
  * Deliberately useless as a general-purpose proxy: the persona (system
- * prompt), model list, and output limits are enforced HERE, so the only
+ * prompt), model list, and output limits are enforced here, so the only
  * thing this endpoint can do is role-play "C".
  *
  * Gates:
- *  - Origin allowlist (env.ALLOWED_ORIGINS, comma-separated; empty = allow all while testing)
- *  - Per-IP rate limit (sliding window, in-memory per isolate — resets on idle/redeploy,
- *    good enough to stop casual abuse of a free-tier key with no billing attached)
- *  - Input caps (max 14 messages, 400 chars each) and output caps (300 tokens)
+ *  - Origin allowlist (env.ALLOWED_ORIGINS, comma-separated; empty = allow all)
+ *  - Per-IP sliding-window rate limit (in-memory per isolate)
+ *  - Input caps (max 14 messages, 400 chars each); 300-token output cap
  *
- * Setup (see DEPLOY.md):
- *  - secret  GEMINI_API_KEY    your free AI Studio key
- *  - var     ALLOWED_ORIGINS   e.g. "https://yourname.github.io"
+ * Config: GEMINI_API_KEY (secret), ALLOWED_ORIGINS (plaintext var)
  */
 
 const MODELS = ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];

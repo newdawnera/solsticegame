@@ -344,10 +344,9 @@ function scriptedReply(text){
   return SCRIPT.reply.deflect[i];
 }
 
-/* ============================== AI PROXY (optional — see DEPLOY.md) ============================== */
-// After deploying the Cloudflare Worker, put its URL here so every visitor gets live AI
-// with zero setup, e.g.: const PROXY_URL = 'https://longest-night-proxy.yourname.workers.dev';
-const PROXY_URL = '';
+/* ============================== AI PROXY ============================== */
+// Hosted proxy endpoint; holds the Gemini key server-side. Empty string disables this tier.
+const PROXY_URL = 'https://longest-night-proxy.jeagundaniel.workers.dev';
 
 /* ============================== GEMINI ============================== */
 const GEM = {

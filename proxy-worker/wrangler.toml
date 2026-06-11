@@ -2,11 +2,8 @@ name = "longest-night-proxy"
 main = "worker.js"
 compatibility_date = "2026-06-01"
 
-# Comma-separated list of origins allowed to call this proxy.
-# Leave empty while testing locally; set to your game's URL before the jam, e.g.:
-#   ALLOWED_ORIGINS = "https://yourname.github.io"
+# Origins allowed to call this proxy (comma-separated).
 [vars]
-ALLOWED_ORIGINS = ""
+ALLOWED_ORIGINS = "https://newdawnera.github.io"
 
-# The Gemini key is a SECRET, never put it in this file. Set it with:
-#   npx wrangler secret put GEMINI_API_KEY
+# GEMINI_API_KEY is configured as a secret, never stored in this file.

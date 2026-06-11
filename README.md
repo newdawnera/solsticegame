@@ -4,42 +4,29 @@ A solstice codebreaking game for the [June Solstice Game Jam](https://dev.to/cha
 
 You are the night-shift cryptanalyst at a remote listening station on June 21. Four encrypted transmissions must be broken before the sun goes down. Between ciphers, you talk to **C** — a colleague on the teletype line — and at dawn you must answer Turing's question: was C human, or machine?
 
-## Play it
-
-Open `index.html` in any modern browser. No build, no server, no dependencies — it's one file.
+**Play it:** [newdawnera.github.io/solsticegame](https://newdawnera.github.io/solsticegame/) — or open `index.html` in any modern browser. No build, no dependencies, one file.
 
 ## The mechanics
 
-- **Daylight is your resource.** It drains in real time (~10 minutes of sun). Wrong transmissions cost 20s, hints cost 45s. If the sun sets, you finish by starlight — the ending remembers.
+- **Daylight is your resource.** It drains in real time (~8 minutes of sun). Wrong transmissions cost 20s, hints cost 45s. If the sun sets, you finish by starlight — the ending remembers.
 - **Four ciphers, rising difficulty:** Caesar shift → Atbash mirror → Vigenère (find the keyword from narrative clues) → rotor cipher (progressive shift, an Enigma nod).
 - **The Turing Test, playable.** C chats with you between levels and never says what it is. At the end, you decide.
+- **A score that follows the sun.** The procedural soundtrack (one of three tracks, picked per visit) dims in tone as daylight fades. Music volume is adjustable independently of the game's sound effects.
 
-## Optional: make C a live AI (free)
+## How C talks: three tiers
 
-1. Go to [aistudio.google.com](https://aistudio.google.com) → **Get API key** (free tier, no credit card).
-2. In the game, click **⚙ KEY** and paste it. The chip switches to `C: LIVE AI`.
-3. C is now powered by Gemini Flash (free-tier models, auto-detected). The key never leaves your browser (stored in localStorage only).
+1. **Hosted proxy** — a Cloudflare Worker (`proxy-worker/`) holds the Gemini key server-side, locked to this game's origin and rate-limited per IP. Visitors get live AI with zero setup.
+2. **Bring your own key** — click **⚙ KEY** in-game and paste a free [AI Studio](https://aistudio.google.com) key. It stays in your browser (localStorage) and is sent only to Google.
+3. **Scripted fallback** — no proxy, no key, no problem: C speaks from a script and the game stays fully playable.
 
-No key? C speaks from a script. The game is fully playable either way, and the ending honestly discloses which one you talked to.
+The ending honestly discloses which C you talked to.
 
 ## Prize categories targeted
 
 - **Main theme** — solstice, light vs. darkness as the core resource, the passage of time
 - **Best Ode to Alan Turing** — codebreaking mechanics, the Imitation Game as the narrative climax, epilogue honoring Turing
-- **Best Google AI Usage** — Gemini API embedded as the character C (the Turing Test, run on an actual AI)
+- **Best Google AI Usage** — Gemini API embedded as the character C (the Turing Test, run on an actual AI), behind a security-gated proxy
 
-## Deploying for the submission
+## Deployment
 
-Judges need a playable link. Two free options:
-
-**GitHub Pages:** push this folder to a repo → Settings → Pages → deploy from branch → main / root. Game lives at `https://<you>.github.io/<repo>/`.
-
-**itch.io:** zip the folder → create new project → "HTML" type → upload zip, check "this file will be played in the browser".
-
-## Remaining TODO before June 21
-
-- [ ] Playtest and tune daylight timing / difficulty
-- [ ] Deploy to a public URL
-- [ ] Record demo video with voiceover (judges strongly encouraged this)
-- [ ] Write the DEV submission post using the official template
-- [ ] Submit before June 21, 11:59 PM PDT
+The game is static HTML on GitHub Pages; the AI proxy is a Cloudflare Worker. Setup notes in [DEPLOY.md](DEPLOY.md).
