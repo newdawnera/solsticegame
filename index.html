@@ -98,8 +98,20 @@
   @keyframes stampin{from{opacity:0;transform:translate(-50%,-50%) rotate(-8deg) scale(3)}
     to{opacity:1;transform:translate(-50%,-50%) rotate(-8deg) scale(1)}}
 
+  /* themed scrollbars (page + chat) */
+  html{scrollbar-width:thin;scrollbar-color:#4a3d1d #0a0c18}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#4a3d1d;border-radius:8px;border:2px solid rgba(10,12,24,.85)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--gold-dim)}
+  ::-webkit-scrollbar-corner{background:transparent}
+
   /* chat */
-  #chatlog,#verdictlog{display:flex;flex-direction:column;gap:12px;margin:14px 0;max-height:46vh;overflow-y:auto}
+  #chatlog,#verdictlog{display:flex;flex-direction:column;gap:12px;margin:14px 0;max-height:46vh;overflow-y:auto;
+    padding-right:8px;scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:var(--gold-dim) transparent}
+  #chatlog::-webkit-scrollbar,#verdictlog::-webkit-scrollbar{width:6px}
+  #chatlog::-webkit-scrollbar-thumb,#verdictlog::-webkit-scrollbar-thumb{background:var(--gold-dim);border:none;border-radius:6px}
+  #chatlog::-webkit-scrollbar-thumb:hover,#verdictlog::-webkit-scrollbar-thumb:hover{background:var(--gold)}
   .msg{max-width:82%;padding:12px 16px;border-radius:10px;font-size:.95rem;line-height:1.55}
   .msg.c{align-self:flex-start;background:rgba(232,184,75,.1);border:1px solid var(--panel-line)}
   .msg.c::before{content:"C";font-family:var(--mono);font-size:.65rem;color:var(--gold);display:block;letter-spacing:.2em;margin-bottom:4px}
