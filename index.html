@@ -152,7 +152,7 @@
     </div>
     <div class="actionrow">
       <button class="primary" onclick="G.start()">BEGIN THE WATCH ▸</button>
-      <button class="ghost" onclick="UI.modal(true)">connect C to a live AI (optional)</button>
+      <button class="ghost" id="introkey" onclick="UI.modal(true)">connect C to a live AI (optional)</button>
     </div>
   </section>
 
@@ -852,6 +852,7 @@ const G = {
 Sky.init();
 UI.refreshChips();
 G.refreshMeter();
+if (PROXY_URL) $('introkey').style.display = 'none';   // C is already live; personal keys stay available via the header chip
 $('gear').addEventListener('click', ()=>UI.modal(true));
 $('mute').addEventListener('click', ()=>{ Snd.init(); Snd.muted=!Snd.muted; Amb.setMute(Snd.muted); $('mute').textContent = Snd.muted?'♪ OFF':'♪ ON'; });
 try{ const sv = parseFloat(localStorage.getItem('tln_vol')); if(!isNaN(sv)) Amb.vol = Math.max(0, Math.min(1, sv)); }catch(e){}
