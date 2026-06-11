@@ -26,7 +26,3 @@ The ending honestly discloses which C you talked to.
 - **Main theme** — solstice, light vs. darkness as the core resource, the passage of time
 - **Best Ode to Alan Turing** — codebreaking mechanics, the Imitation Game as the narrative climax, epilogue honoring Turing
 - **Best Google AI Usage** — Gemini API embedded as the character C (the Turing Test, run on an actual AI), behind a security-gated proxy
-
-## Deployment
-
-The game is static HTML on GitHub Pages; the AI proxy is a Cloudflare Worker. Setup notes in [DEPLOY.md](DEPLOY.md).
