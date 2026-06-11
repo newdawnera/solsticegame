@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0c18">
 <title>The Longest Night — a solstice codebreaking game</title>
 <style>
   :root{
@@ -13,7 +14,9 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
+  html{-webkit-tap-highlight-color:transparent}
   body{font-family:var(--serif);color:var(--ink);background:#0a0c18;overflow-x:hidden}
+  input[type=range]{touch-action:none}  /* dragging a dial shouldn't scroll the page */
   #sky{position:fixed;inset:0;z-index:0;width:100%;height:100%}
   /* subtle CRT scanlines + vignette */
   #crt{position:fixed;inset:0;z-index:2;pointer-events:none;
@@ -120,7 +123,46 @@
   #modal.on{display:flex}
   .modalcard{background:#11131f;border:1px solid var(--panel-line);border-radius:10px;padding:26px;max-width:520px;width:100%}
   footer{position:relative;z-index:1;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--ink-dim);letter-spacing:.15em;padding:10px}
-  @media(max-width:560px){section{padding:18px 16px}.msg{max-width:95%}.stamp{font-size:1.2rem}}
+  /* ---------- small screens (phones, ~360-600px) ---------- */
+  @media(max-width:600px){
+    .wrap{padding:10px 10px 40px}
+    /* compact sticky header: the sun meter stays in view while playing */
+    header{position:sticky;top:6px;z-index:6;background:rgba(10,12,24,.92);border:1px solid var(--panel-line);
+      border-radius:10px;padding:8px 10px;gap:6px;margin-bottom:12px;backdrop-filter:blur(6px)}
+    header h1{font-size:.78rem;letter-spacing:.22em;width:100%;text-align:center;order:-2}
+    .meterbox{order:-1;flex:1 1 100%}
+    .chip{font-size:.6rem;padding:3px 7px;letter-spacing:.05em}
+    #volchip input{width:52px}
+    section{padding:16px 13px}
+    h2{font-size:.68rem;letter-spacing:.18em}
+    p{font-size:.92rem;line-height:1.55}
+    .howto{gap:8px}
+    .how{min-width:100%;padding:11px;font-size:.82rem}
+    .how b{font-size:.95rem}
+    .objective{font-size:.68rem;padding:8px 10px}
+    .cipherbox,.previewbox{letter-spacing:.1em;font-size:.84rem;line-height:1.85;padding:12px 13px}
+    .coach{font-size:.82rem}
+    /* tools: label on its own line, slider full-width with a tall touch area */
+    .toolrow{gap:8px}
+    .toolrow label{flex:1 1 100%}
+    input[type=range]{flex:1 1 100%;min-width:0;height:36px}
+    input[type=text],input[type=password]{font-size:16px;flex:1 1 100%;min-width:0}  /* 16px stops focus auto-zoom */
+    .lensbtns button{flex:1 1 28%;min-width:90px}
+    /* comfortable touch targets */
+    button{min-height:44px;padding:11px 14px;font-size:.8rem}
+    button.ghost{min-height:38px;padding:8px 10px;font-size:.68rem}
+    .actionrow{gap:8px}
+    .actionrow .primary{flex:1 1 100%}
+    .msg{max-width:94%;font-size:.9rem;padding:10px 12px}
+    #chatlog,#verdictlog{max-height:40vh}
+    .chatrow input{flex:1 1 58%}
+    .verdictbtns{gap:8px}
+    .verdictbtns button{flex:1 1 100%;min-width:0;padding:14px}
+    .stat{min-width:calc(50% - 6px)}
+    .stamp{font-size:1.05rem;letter-spacing:.18em;padding:8px 14px;white-space:nowrap}
+    .modalcard{padding:18px 14px}
+    footer{font-size:.55rem;letter-spacing:.1em}
+  }
 </style>
 </head>
 <body>
@@ -356,15 +398,25 @@ const GEM = {
   live(){ return !!PROXY_URL || !!this.key(); },
   sys: 'You are "C", the only other operator on a teletype line to a remote listening station, on the night of the June solstice. '+
        'You are warm, wry, slightly melancholy; fascinated by codes, light, time, and whether machines can think. '+
-       'Reply in 1-3 short sentences of plain text. No markdown, no emoji, no stage directions. '+
+       'Reply in 1-3 short sentences of plain text, always ending on a complete sentence. No markdown, no emoji, no stage directions. '+
        'NEVER reveal whether you are a human or a machine; if asked directly, deflect gracefully or turn the question around. '+
        'Never mention being an AI model, Gemini, or Google. Stay in character always. '+
+       'If the operator drifts off-topic — modern life, other subjects, nonsense — answer briefly in character, then steer them back: '+
+       'a transmission is waiting, the light is going, the work will not do itself. '+
        'You may reference: the fading daylight, the four transmissions, the solstice, or Alan Turing\'s famous question.',
+  // trim to the last complete sentence — no cut-off replies, whatever the upstream did
+  tidy(s){
+    s = String(s||'').replace(/\s+/g,' ').trim();
+    if (!s || /[.!?…"'”’]$/.test(s)) return s;
+    const cut = Math.max(s.lastIndexOf('.'), s.lastIndexOf('!'), s.lastIndexOf('?'), s.lastIndexOf('…'));
+    return cut > 0 ? s.slice(0, cut+1) : s;
+  },
   // 3-tier fallback: hosted proxy -> player's own key -> scripted C (handled by caller)
   async ask(playerMsg){
     this.history.push({role:'user', parts:[{text:playerMsg}]});
     let t = await this.askProxy();
     if (!t) t = await this.askDirect();
+    if (t) t = this.tidy(t);
     if (t){ this.history.push({role:'model', parts:[{text:t}]}); return t; }
     this.history.pop();   // leave history clean for the scripted fallback
     return null;
@@ -389,7 +441,7 @@ const GEM = {
     const body = JSON.stringify({
       system_instruction:{parts:[{text:this.sys}]},
       contents:this.history.slice(-12),
-      generationConfig:{maxOutputTokens:1000, temperature:0.9}
+      generationConfig:{maxOutputTokens:2048, temperature:0.9}
     });
     let preferred = '';
     try{ preferred = localStorage.getItem('tln_model')||''; }catch(e){}

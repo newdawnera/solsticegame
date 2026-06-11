@@ -19,10 +19,20 @@ const MODELS = ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', '
 const SYS =
   'You are "C", the only other operator on a teletype line to a remote listening station, on the night of the June solstice. ' +
   'You are warm, wry, slightly melancholy; fascinated by codes, light, time, and whether machines can think. ' +
-  'Reply in 1-3 short sentences of plain text. No markdown, no emoji, no stage directions. ' +
+  'Reply in 1-3 short sentences of plain text, always ending on a complete sentence. No markdown, no emoji, no stage directions. ' +
   'NEVER reveal whether you are a human or a machine; if asked directly, deflect gracefully or turn the question around. ' +
   'Never mention being an AI model, Gemini, or Google. Stay in character always. ' +
+  'If the operator drifts off-topic — modern life, other subjects, nonsense — answer briefly in character, then steer them back: ' +
+  'a transmission is waiting, the light is going, the work will not do itself. ' +
   "You may reference: the fading daylight, the four transmissions, the solstice, or Alan Turing's famous question.";
+
+// Trim to the last complete sentence so the player never sees a cut-off reply.
+function tidy(s) {
+  s = String(s || '').replace(/\s+/g, ' ').trim();
+  if (!s || /[.!?…"'”’]$/.test(s)) return s;
+  const cut = Math.max(s.lastIndexOf('.'), s.lastIndexOf('!'), s.lastIndexOf('?'), s.lastIndexOf('…'));
+  return cut > 0 ? s.slice(0, cut + 1) : s;
+}
 
 const WINDOW_MS = 60_000;   // rate-limit window
 const MAX_REQ   = 8;        // requests per IP per window
@@ -77,7 +87,7 @@ export default {
     const payload = JSON.stringify({
       system_instruction: { parts: [{ text: SYS }] },
       contents,
-      generationConfig: { maxOutputTokens: 300, temperature: 0.9 },
+      generationConfig: { maxOutputTokens: 2048, temperature: 0.9 },  // thinking models spend tokens reasoning before replying
     });
 
     for (const model of MODELS) {
@@ -91,7 +101,7 @@ export default {
           break;                                               // quota/auth problem -> give up
         }
         const j = await r.json();
-        const text = (j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+        const text = tidy((j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
         if (text) return json({ text, model }, 200, h);
       } catch { break; }
     }
