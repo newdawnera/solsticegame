@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Longest Night — a solstice codebreaking game</title>
+<style>
+  :root{
+    --gold:#e8b84b; --gold-dim:#a8862f; --ink:#e9e4d8; --ink-dim:#9a948a;
+    --panel:rgba(12,14,24,.84); --panel-line:rgba(232,184,75,.25);
+    --good:#7ed98c; --bad:#e87a6a; --mono:"Courier New",ui-monospace,Menlo,Consolas,monospace;
+    --serif:Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--serif);color:var(--ink);background:#0a0c18;overflow-x:hidden}
+  #sky{position:fixed;inset:0;z-index:0;width:100%;height:100%}
+  /* subtle CRT scanlines + vignette */
+  #crt{position:fixed;inset:0;z-index:2;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.10) 0 1px,transparent 1px 3px);}
+  #vig{position:fixed;inset:0;z-index:2;pointer-events:none;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.5) 100%);}
+  #flash{position:fixed;inset:0;z-index:3;pointer-events:none;opacity:0}
+  #flash.gold{background:rgba(232,184,75,.35);animation:flashout .6s ease-out}
+  #flash.red{background:rgba(220,70,50,.3);animation:flashout .5s ease-out}
+  @keyframes flashout{from{opacity:1}to{opacity:0}}
+
+  .wrap{position:relative;z-index:1;max-width:880px;margin:0 auto;padding:18px 16px 60px}
+  .wrap.shake{animation:shake .35s ease}
+  @keyframes shake{0%,100%{transform:none}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+
+  /* header */
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  header h1{font-size:1rem;letter-spacing:.32em;font-weight:normal;color:var(--gold);white-space:nowrap}
+  .meterbox{flex:1;min-width:150px;display:flex;align-items:center;gap:8px;position:relative}
+  .meterbox .sun{font-size:.9rem}
+  .meter{flex:1;height:10px;border:1px solid var(--panel-line);border-radius:6px;overflow:hidden;background:rgba(0,0,0,.45)}
+  .meter i{display:block;height:100%;background:linear-gradient(90deg,#5a3a10,var(--gold));width:100%;transition:width .6s ease}
+  .meterbox.low .meter{animation:lowsun 1s infinite}
+  @keyframes lowsun{50%{border-color:rgba(232,110,75,.8);box-shadow:0 0 10px rgba(232,110,75,.5)}}
+  .floatloss{position:absolute;right:0;top:-16px;font-family:var(--mono);font-size:.75rem;color:var(--bad);animation:floatup 1.2s ease-out forwards;pointer-events:none}
+  @keyframes floatup{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-18px)}}
+  .chip{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;border:1px solid var(--panel-line);border-radius:20px;padding:4px 10px;color:var(--ink-dim);background:var(--panel);white-space:nowrap}
+  .chip b{color:var(--gold);font-weight:normal}
+  .chip.click{cursor:pointer;user-select:none}
+  .chip.click:hover{color:var(--gold)}
+  #dots b{letter-spacing:.25em}
+  #volchip{display:inline-flex;align-items:center;gap:6px}
+  #volchip input{width:70px;height:12px;accent-color:var(--gold);cursor:pointer}
+
+  /* panels */
+  section{display:none;position:relative;background:var(--panel);border:1px solid var(--panel-line);border-radius:10px;padding:26px 28px;backdrop-filter:blur(3px)}
+  section.on{display:block;animation:fadein .5s ease}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  h2{font-size:.8rem;font-family:var(--mono);letter-spacing:.3em;color:var(--gold);margin-bottom:14px;font-weight:normal}
+  p{line-height:1.65;margin-bottom:12px}
+  .dim{color:var(--ink-dim)} .small{font-size:.82rem}
+
+  .howto{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+  .how{flex:1;min-width:180px;border:1px solid var(--panel-line);border-radius:8px;padding:14px;font-size:.85rem;line-height:1.5}
+  .how b{display:block;font-family:var(--mono);font-size:1.1rem;color:var(--gold);font-weight:normal;margin-bottom:6px}
+
+  button{font-family:var(--mono);font-size:.85rem;letter-spacing:.08em;color:var(--gold);background:transparent;
+    border:1px solid var(--gold-dim);border-radius:6px;padding:10px 20px;cursor:pointer;transition:all .15s}
+  button:hover{background:rgba(232,184,75,.12)}
+  button:disabled{opacity:.35;cursor:default}
+  button.primary{background:rgba(232,184,75,.14)}
+  button.pulse{animation:pulse 1s infinite;border-color:var(--gold);background:rgba(232,184,75,.2)}
+  @keyframes pulse{50%{box-shadow:0 0 16px rgba(232,184,75,.6)}}
+  button.ghost{border-color:rgba(255,255,255,.15);color:var(--ink-dim);font-size:.72rem;padding:7px 12px}
+
+  /* cipher UI */
+  .objective{font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;color:var(--gold);
+    border:1px dashed var(--panel-line);border-radius:6px;padding:9px 12px;margin:4px 0 10px;background:rgba(232,184,75,.05)}
+  .cipherbox,.previewbox{font-family:var(--mono);letter-spacing:.18em;line-height:2;padding:16px 18px;border-radius:8px;margin:10px 0;word-break:break-word}
+  .cipherbox{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08);color:#cfd8ff}
+  .previewbox{background:rgba(232,184,75,.06);border:1px dashed var(--panel-line);color:var(--ink);min-height:3.2em;transition:box-shadow .3s}
+  .previewbox .whit{color:var(--gold);text-shadow:0 0 8px rgba(232,184,75,.7)}
+  .previewbox.solved{border-style:solid;border-color:var(--gold);box-shadow:0 0 18px rgba(232,184,75,.35);color:var(--gold)}
+  .coach{font-style:italic;color:var(--gold);font-size:.88rem;min-height:1.5em;margin:6px 0 2px}
+  .toolrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:14px 0}
+  .toolrow label{font-family:var(--mono);font-size:.75rem;color:var(--ink-dim);letter-spacing:.1em}
+  input[type=range]{flex:1;min-width:160px;accent-color:var(--gold);height:26px;cursor:pointer}
+  input[type=text],input[type=password]{font-family:var(--mono);font-size:.95rem;letter-spacing:.15em;background:rgba(0,0,0,.5);
+    border:1px solid var(--panel-line);border-radius:6px;color:var(--ink);padding:10px 12px;flex:1;min-width:140px}
+  input[type=text]:focus,input[type=password]:focus{outline:none;border-color:var(--gold-dim)}
+  .lensbtns button.sel{background:rgba(232,184,75,.2);border-color:var(--gold)}
+  .feedback{font-family:var(--mono);font-size:.8rem;min-height:1.4em;margin-top:10px}
+  .feedback.ok{color:var(--good)} .feedback.no{color:var(--bad)}
+  .actionrow{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;align-items:center}
+  .stamp{position:absolute;top:38%;left:50%;z-index:5;transform:translate(-50%,-50%) rotate(-8deg) scale(3);opacity:0;
+    font-family:var(--mono);font-size:2rem;letter-spacing:.3em;color:var(--gold);border:3px solid var(--gold);
+    border-radius:8px;padding:10px 26px;background:rgba(10,12,24,.85);pointer-events:none}
+  .stamp.show{animation:stampin .8s cubic-bezier(.2,1.6,.4,1) forwards}
+  @keyframes stampin{from{opacity:0;transform:translate(-50%,-50%) rotate(-8deg) scale(3)}
+    to{opacity:1;transform:translate(-50%,-50%) rotate(-8deg) scale(1)}}
+
+  /* chat */
+  #chatlog,#verdictlog{display:flex;flex-direction:column;gap:12px;margin:14px 0;max-height:46vh;overflow-y:auto}
+  .msg{max-width:82%;padding:12px 16px;border-radius:10px;font-size:.95rem;line-height:1.55}
+  .msg.c{align-self:flex-start;background:rgba(232,184,75,.1);border:1px solid var(--panel-line)}
+  .msg.c::before{content:"C";font-family:var(--mono);font-size:.65rem;color:var(--gold);display:block;letter-spacing:.2em;margin-bottom:4px}
+  .msg.you{align-self:flex-end;background:rgba(120,140,255,.1);border:1px solid rgba(120,140,255,.25)}
+  .msg.you::before{content:"YOU";font-family:var(--mono);font-size:.65rem;color:#9fb0ff;display:block;letter-spacing:.2em;margin-bottom:4px}
+  .chatrow{display:flex;gap:10px;margin-top:8px}
+  .typing{font-family:var(--mono);color:var(--ink-dim);font-size:.8rem;letter-spacing:.3em;animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* verdict + end */
+  .verdictbtns{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px}
+  .verdictbtns button{flex:1;min-width:140px;padding:16px}
+  .statgrid{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+  .stat{flex:1;min-width:120px;border:1px solid var(--panel-line);border-radius:8px;padding:12px;text-align:center}
+  .stat b{display:block;font-family:var(--mono);font-size:1.2rem;color:var(--gold);font-weight:normal;margin-bottom:4px}
+  .stat span{font-size:.7rem;font-family:var(--mono);color:var(--ink-dim);letter-spacing:.1em}
+  .epilogue{border-left:2px solid var(--gold-dim);padding-left:16px;margin:18px 0;font-style:italic;color:var(--ink-dim)}
+
+  /* modal */
+  #modal{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:16px}
+  #modal.on{display:flex}
+  .modalcard{background:#11131f;border:1px solid var(--panel-line);border-radius:10px;padding:26px;max-width:520px;width:100%}
+  footer{position:relative;z-index:1;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--ink-dim);letter-spacing:.15em;padding:10px}
+  @media(max-width:560px){section{padding:18px 16px}.msg{max-width:95%}.stamp{font-size:1.2rem}}
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div id="crt"></div><div id="vig"></div><div id="flash"></div>
+
+<div class="wrap" id="wrap">
+  <header>
+    <h1>THE LONGEST NIGHT</h1>
+    <div class="meterbox" id="meterbox"><span class="sun">☀</span><div class="meter"><i id="meterfill"></i></div></div>
+    <span class="chip">⏱ <b id="clock">16:04</b></span>
+    <span class="chip" id="dots"><b>○○○○</b></span>
+    <span class="chip">C: <b id="aichip">SCRIPTED</b></span>
+    <span class="chip" id="volchip" title="music volume">♬ <input type="range" id="musicvol" min="0" max="100" value="80"></span>
+    <span class="chip click" id="mute">♪ ON</span>
+    <span class="chip click" id="gear">⚙ KEY</span>
+  </header>
+
+  <!-- INTRO -->
+  <section id="s-intro" class="on">
+    <h2>JUNE 21 · STATION 21 · 16:04</h2>
+    <p>The solstice — the longest day of the year, and the only one you'd trade away.
+       Four encrypted transmissions arrived at noon. Command wants them broken <b style="color:var(--gold)">before sundown</b>.
+       Your only company is <b style="color:var(--gold)">C</b>, a colleague on the teletype line you've never met.</p>
+    <div class="howto">
+      <div class="how"><b>☀ THE SUN IS YOUR CLOCK</b>It sinks as you work. Mistakes and hints burn extra daylight. At 21:58 it's gone.</div>
+      <div class="how"><b>✎ BREAK 4 CODES</b>Turn dials, pick lenses, find keywords — when glowing words appear, you're close.</div>
+      <div class="how"><b>✆ TALK TO C</b>Between codes, C wants to chat. At dawn you'll answer one question about them.</div>
+    </div>
+    <div class="actionrow">
+      <button class="primary" onclick="G.start()">BEGIN THE WATCH ▸</button>
+      <button class="ghost" onclick="UI.modal(true)">connect C to a live AI (optional)</button>
+    </div>
+  </section>
+
+  <!-- LEVEL -->
+  <section id="s-level">
+    <div class="stamp" id="stamp">DECODED</div>
+    <h2 id="lvltitle">TRANSMISSION ONE</h2>
+    <p id="lvlbrief" class="dim"></p>
+    <div class="objective" id="objective"></div>
+    <div class="cipherbox" id="ciphertext"></div>
+    <div id="toolarea"></div>
+    <p class="small dim" style="margin-top:8px">DECODED PREVIEW</p>
+    <div class="previewbox" id="preview"></div>
+    <div class="coach" id="coach"></div>
+    <div class="actionrow">
+      <button class="primary" id="transmitbtn" onclick="G.transmit()">TRANSMIT ▸</button>
+      <button class="ghost" id="hint1" onclick="G.hint(0)">hint 1 (−45s sun)</button>
+      <button class="ghost" id="hint2" onclick="G.hint(1)">hint 2 (−45s sun)</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+  </section>
+
+  <!-- CHAT -->
+  <section id="s-chat">
+    <h2>TELETYPE · LINE OPEN</h2>
+    <div id="chatlog"></div>
+    <div class="chatrow" id="chatinputrow">
+      <input type="text" id="chatinput" maxlength="240" placeholder="type a reply to C…">
+      <button onclick="G.sendChat()">SEND</button>
+    </div>
+    <div class="actionrow" id="chatcontinue" style="display:none">
+      <button class="primary" onclick="G.nextLevel()">BACK TO THE TRANSMISSIONS ▸</button>
+    </div>
+  </section>
+
+  <!-- VERDICT -->
+  <section id="s-verdict">
+    <h2>THE QUESTION</h2>
+    <div id="verdictlog"></div>
+    <div class="verdictbtns">
+      <button onclick="G.verdict('HUMAN')">A HUMAN</button>
+      <button onclick="G.verdict('MACHINE')">A MACHINE</button>
+      <button onclick="G.verdict('IT DOES NOT MATTER')">IT DOESN'T MATTER</button>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section id="s-end">
+    <h2 id="endtitle">DAWN</h2>
+    <div id="endbody"></div>
+    <div class="statgrid">
+      <div class="stat"><b id="st-time">—</b><span>TIME ON WATCH</span></div>
+      <div class="stat"><b id="st-sun">—</b><span>DAYLIGHT LEFT</span></div>
+      <div class="stat"><b id="st-verdict">—</b><span>YOUR ANSWER</span></div>
+      <div class="stat"><b id="st-badge">—</b><span>COMMENDATION</span></div>
+    </div>
+    <div class="epilogue">
+      Alan Turing was born in June, 1912. He broke the codes that shortened a war, asked the century's
+      best question — <i>can machines think?</i> — and was persecuted by the country he helped save, for being gay.
+      The solstice is his: the longest light, and what we owe to the people who worked in the dark.
+    </div>
+    <div class="actionrow"><button class="primary" onclick="location.reload()">STAND ANOTHER WATCH ▸</button></div>
+  </section>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="modal">
+  <div class="modalcard">
+    <h2>CONNECT C TO GEMINI (OPTIONAL)</h2>
+    <p class="small dim">If this copy of the game has a hosted AI proxy configured, C is already live and you need nothing here.
+      Otherwise, paste a free Google AI Studio API key and C will answer you live, powered by Gemini Flash.
+      No key? C speaks from a script — the game works either way. Your key is stored only in this browser
+      and sent only to Google. Tip: use a key from an account with no billing attached.</p>
+    <div class="toolrow"><input type="password" id="keyinput" placeholder="AIza…"></div>
+    <div class="actionrow">
+      <button class="primary" onclick="UI.saveKey()">SAVE KEY</button>
+      <button class="ghost" onclick="UI.clearKey()">clear</button>
+      <button class="ghost" onclick="UI.modal(false)">close</button>
+    </div>
+    <div class="feedback" id="keyfeedback"></div>
+    <p class="small dim" style="margin-top:10px">Get a key: aistudio.google.com → "Get API key" (free tier, no card).</p>
+  </div>
+</div>
+
+<footer>MADE FOR THE JUNE SOLSTICE GAME JAM · 2026</footer>
+
+<script>
+'use strict';
+/* ============================== CIPHER CORE ============================== */
+const AC = 65;
+const norm = s => s.toUpperCase().replace(/[^A-Z]/g,'');
+function mapLetters(s, fn){
+  let li = 0;
+  return s.toUpperCase().split('').map(ch=>{
+    const c = ch.charCodeAt(0) - AC;
+    if (c >= 0 && c < 26){ const r = fn(c, li); li++; return String.fromCharCode(AC + ((r % 26) + 26) % 26); }
+    return ch;
+  }).join('');
+}
+const caesarEnc = (s,k)=>mapLetters(s,c=>c+k);
+const caesarDec = (s,k)=>mapLetters(s,c=>c-k);
+const atbash    = s=>mapLetters(s,c=>25-c);
+const rot13     = s=>caesarEnc(s,13);
+const revStr    = s=>s.split('').reverse().join('');
+const vigEnc = (s,key)=>{ key=norm(key); return key?mapLetters(s,(c,i)=>c+(key.charCodeAt(i%key.length)-AC)):s; };
+const vigDec = (s,key)=>{ key=norm(key); return key?mapLetters(s,(c,i)=>c-(key.charCodeAt(i%key.length)-AC)):s; };
+const rotorEnc = (s,st)=>mapLetters(s,(c,i)=>c+st+i);
+const rotorDec = (s,st)=>mapLetters(s,(c,i)=>c-st-i);
+
+/* ============================== LEVEL DATA ============================== */
+const LEVELS = [
+  { n:'ONE', type:'caesar', shift:7,
+    plain:'THE SUN STANDS STILL TODAY BUT WE DO NOT',
+    brief:'A simple rotation — the oldest trick in the book.',
+    obj:'OBJECTIVE: drag the dial until noise becomes words.',
+    hints:['Caesar shifted every letter of his orders by the same fixed amount.',
+           'Try a shift equal to the number of days in a week.'] },
+  { n:'TWO', type:'lens', lens:'mirror',
+    plain:'AT MIDNIGHT EVEN THE MACHINE DREAMS OF LIGHT',
+    brief:'The alphabet has been reflected somehow.',
+    obj:'OBJECTIVE: one of the three lenses will read it. Choose.',
+    hints:['Hold the alphabet up to a mirror: the first letter trades places with the last.',
+           'A becomes Z. B becomes Y. Pick the MIRROR.'] },
+  { n:'THREE', type:'vigenere', key:'SOLSTICE',
+    plain:'CAN MACHINES THINK IS THE WRONG QUESTION ASK INSTEAD WHAT THINKING IS',
+    brief:'A keyword cipher. C taps out one clue: “the key is the reason we are both awake tonight.”',
+    obj:'OBJECTIVE: type the keyword. The clue is in C’s message above.',
+    hints:['The keyword is a single word, eight letters long.',
+           'The reason you are both awake tonight: the day the SUN STANDS STILL.'] },
+  { n:'FOUR', type:'rotor', start:3,
+    plain:'THE IMITATION GAME ENDS AT DAWN',
+    brief:'A rotor machine — the wheel advances one step with every letter.',
+    obj:'OBJECTIVE: find where the rotor started.',
+    hints:['Each letter is shifted one more than the letter before it.',
+           'The first letter was shifted by the number of sides on a triangle.'] },
+];
+
+/* dictionary for the "glowing words" warm-feedback */
+const DICT = new Set(('THE SUN STANDS STILL TODAY BUT WE DO NOT AT MIDNIGHT EVEN MACHINE DREAMS OF LIGHT CAN '+
+  'MACHINES THINK IS WRONG QUESTION ASK INSTEAD WHAT THINKING IMITATION GAME ENDS DAWN AND TO IN IT YOU '+
+  'THAT HE SHE WAS FOR ON ARE AS WITH HIS HER THEY BE THIS HAVE FROM OR ONE HAD BY ALL THERE WHEN UP HOW AN MY '+
+  'NO YES SO IF ME GO US AM DAY NIGHT TIME CODE KEY WORD WORDS WHO WHY NOW HERE').split(' '));
+
+/* ============================== SCRIPTED C ============================== */
+const SCRIPT = {
+  open: [
+    'Quick work on the first one. The day shift took four hours on less. Tell me — do you ever wonder whether anyone reads what we decode, or whether it all goes into a drawer somewhere?',
+    'You broke the mirror faster than I expected. I once told the station chief that a machine could do our job within twenty years. He laughed. I did not.',
+    'SOLSTICE. Of course. The sun stands still and we run in circles. May I ask — when you found the key, did you feel it, or compute it? I have never been sure there is a difference.'
+  ],
+  reply: {
+    machine:'A machine, you say. Curious word. A machine is only a mind you can point at.',
+    human:'Human — you use that word like a password. As if it settled anything.',
+    question:'You ask better questions than the day shift. Keep that. Questions outlive their answers.',
+    why:'Why? The sun does not ask why it climbs. It climbs, and we measure the shadow.',
+    greet:'Evening — or what is left of it. The light does not wait on pleasantries, and neither should we.',
+    thanks:'That is the kindest thing anyone has tapped down this line all month. Go on — a transmission is waiting.',
+    rude:'The wire carries everything, even that. I have heard worse from the weather. Back to work.',
+    noise:'Static? Or a test, to see what I make of noise? Even noise has a frequency, friend.',
+    name:'C will do. Out here, a whole name is more than the wire needs to carry.',
+    short:'Economical. The best operators always are. Back to it — the sun is not waiting for either of us.',
+    deflect:[
+      'Mm. The light is going amber on my window too. We should both get back to it.',
+      'I will think about that while the rotor turns. The sun will not hold still forever, whatever the almanac says.',
+      'Perhaps. Out here on the night shift, perhaps is the most honest word there is.'
+    ]
+  },
+  final:'Last one is broken, and the line closes at dawn. Before it does — you have talked with me all night, watched me think, or seem to. One question, and answer honestly: what am I?'
+};
+let lastDeflect = -1;
+function scriptedReply(text){
+  const t = (text||'').toLowerCase().trim();
+  const letters = norm(t);
+  // gibberish / keyboard-mash / dismissals
+  if (/nonsense|gibberish|blah|asdf|qwer|whatever|random|\btest\b/.test(t)) return SCRIPT.reply.noise;
+  if (letters.length >= 4 && !/[AEIOUY]/.test(letters))                     return SCRIPT.reply.noise;
+  if (/machine|robot|computer|\bai\b|model|program|bot\b/.test(t))          return SCRIPT.reply.machine;
+  if (/human|person|alive|\breal\b|flesh/.test(t))                          return SCRIPT.reply.human;
+  if (/stupid|idiot|dumb|shut up|hate|boring/.test(t))                      return SCRIPT.reply.rude;
+  if (/^(hi|hey|hello|yo|good (evening|morning|night)|evening)\b/.test(t))  return SCRIPT.reply.greet;
+  if (/thank|kind of you|nice|lovely|great|well said|beautiful/.test(t))    return SCRIPT.reply.thanks;
+  if (/your name|who are you|what are you|call you/.test(t))                return SCRIPT.reply.name;
+  if (/why/.test(t))                                                        return SCRIPT.reply.why;
+  if (/\?/.test(t))                                                         return SCRIPT.reply.question;
+  if (letters.length < 8)                                                   return SCRIPT.reply.short;
+  // rotate deflects, never repeat the last one
+  let i; do { i = Math.floor(Math.random()*SCRIPT.reply.deflect.length); } while (i === lastDeflect);
+  lastDeflect = i;
+  return SCRIPT.reply.deflect[i];
+}
+
+/* ============================== AI PROXY (optional — see DEPLOY.md) ============================== */
+// After deploying the Cloudflare Worker, put its URL here so every visitor gets live AI
+// with zero setup, e.g.: const PROXY_URL = 'https://longest-night-proxy.yourname.workers.dev';
+const PROXY_URL = '';
+
+/* ============================== GEMINI ============================== */
+const GEM = {
+  models:['gemini-3-flash','gemini-2.5-flash','gemini-2.5-flash-lite','gemini-flash-latest'],
+  history:[],
+  key(){ try{ return localStorage.getItem('tln_key')||''; }catch(e){ return ''; } },
+  live(){ return !!PROXY_URL || !!this.key(); },
+  sys: 'You are "C", the only other operator on a teletype line to a remote listening station, on the night of the June solstice. '+
+       'You are warm, wry, slightly melancholy; fascinated by codes, light, time, and whether machines can think. '+
+       'Reply in 1-3 short sentences of plain text. No markdown, no emoji, no stage directions. '+
+       'NEVER reveal whether you are a human or a machine; if asked directly, deflect gracefully or turn the question around. '+
+       'Never mention being an AI model, Gemini, or Google. Stay in character always. '+
+       'You may reference: the fading daylight, the four transmissions, the solstice, or Alan Turing\'s famous question.',
+  // 3-tier fallback: hosted proxy -> player's own key -> scripted C (handled by caller)
+  async ask(playerMsg){
+    this.history.push({role:'user', parts:[{text:playerMsg}]});
+    let t = await this.askProxy();
+    if (!t) t = await this.askDirect();
+    if (t){ this.history.push({role:'model', parts:[{text:t}]}); return t; }
+    this.history.pop();   // leave history clean for the scripted fallback
+    return null;
+  },
+  // Tier 1: hosted proxy — key and persona live server-side
+  async askProxy(){
+    if (!PROXY_URL) return null;
+    try{
+      const contents = this.history.slice(-12)
+        .map(m=>({role:m.role, text:(m.parts && m.parts[0] && m.parts[0].text) || ''}))
+        .filter(m=>m.text);
+      const r = await fetch(PROXY_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents})});
+      if (!r.ok) return null;
+      const j = await r.json();
+      return (j && typeof j.text === 'string' && j.text.trim()) ? j.text.trim() : null;
+    }catch(e){ return null; }
+  },
+  // Tier 2: the player's own key, straight from their browser
+  async askDirect(){
+    const key = this.key(); if (!key) return null;
+    const body = JSON.stringify({
+      system_instruction:{parts:[{text:this.sys}]},
+      contents:this.history.slice(-12),
+      generationConfig:{maxOutputTokens:1000, temperature:0.9}
+    });
+    let preferred = '';
+    try{ preferred = localStorage.getItem('tln_model')||''; }catch(e){}
+    const order = preferred ? [preferred, ...this.models.filter(m=>m!==preferred)] : this.models;
+    for (const m of order){
+      try{
+        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+encodeURIComponent(key),
+          {method:'POST', headers:{'Content-Type':'application/json'}, body});
+        if (!r.ok){ if (r.status===404 || r.status===400) continue; return null; }
+        const j = await r.json();
+        const t = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts || [])
+                  .map(p=>p.text||'').join('').trim();
+        if (t){
+          try{ localStorage.setItem('tln_model', m); }catch(e){}
+          return t;
+        }
+      }catch(e){ return null; }
+    }
+    return null;
+  }
+};
+
+/* ============================== SOUND (synthesized, no assets) ============================== */
+const Snd = {
+  ctx:null, muted:false,
+  init(){ if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+          if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  env(freq,type,dur,gain,slide){
+    if(!this.ctx || this.muted) return;
+    const t=this.ctx.currentTime, o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq,t);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,t+dur);
+    g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(this.ctx.destination); o.start(t); o.stop(t+dur);
+  },
+  tick(){ this.env(1700,'square',0.025,0.02); },
+  type(){ this.env(2300,'square',0.012,0.013); },
+  good(){ this.env(523,'sine',0.18,0.07); setTimeout(()=>this.env(784,'sine',0.35,0.07),130); },
+  bad(){ this.env(150,'sawtooth',0.4,0.08,85); },
+  night(){ this.env(110,'sine',1.4,0.06,50); },
+  send(){ this.env(880,'sine',0.08,0.04); }
+};
+
+/* ============================== AMBIENT MUSIC (procedural; 3 soft tracks, random per visit) ==============================
+   NOTE: the volume slider controls ONLY this music bus (Amb.master).
+   Interactive SFX (Snd.*) connect straight to the destination and are unaffected. */
+const Amb = {
+  started:false, step:0, ci:0, nextT:0, vol:0.8, track:null,
+  tracks:[
+    { name:'Solstice', bpm:72, timbre:'sine', ring:1.7, sparkle:0.10,
+      prog:[[60,64,67,71,72],[57,60,64,67,69],[53,57,60,64,65],[55,59,62,67,69]],   // Cmaj7 Am7 Fmaj7 Gadd9
+      pattern:[0,1,2,3,4,3,2,1] },
+    { name:'Midnight Garden', bpm:63, timbre:'triangle', ring:2.3, sparkle:0.07,
+      prog:[[57,60,64,67,71],[53,57,60,64,69],[60,64,67,71,72],[52,55,59,62,67]],   // Am9 Fmaj7 Cmaj7 Em7
+      pattern:[0,2,4,3,1,3,2,1] },
+    { name:'First Light', bpm:80, timbre:'sine', ring:1.5, sparkle:0.14,
+      prog:[[53,57,60,64,65],[55,59,62,64,67],[57,60,64,67,69],[60,64,67,71,72]],   // Fmaj7 G6 Am7 Cmaj7
+      pattern:[0,1,2,3,2,4,3,2] },
+  ],
+  hz(m){ return 440*Math.pow(2,(m-69)/12); },
+  start(){
+    if (this.started || !Snd.ctx) return;
+    const ctx = Snd.ctx;
+    this.track = this.tracks[Math.floor(Math.random()*this.tracks.length)];   // fresh pick every visit
+    this.stepDur = 60/this.track.bpm/2;
+    this.master = ctx.createGain();
+    this.master.gain.value = Snd.muted ? 0 : this.vol;
+    this.filt = ctx.createBiquadFilter();
+    this.filt.type='lowpass'; this.filt.frequency.value=2400; this.filt.Q.value=0.2;
+    this.filt.connect(this.master); this.master.connect(ctx.destination);
+    this.nextT = ctx.currentTime + 0.1;
+    this.timer = setInterval(()=>this.sched(), 180);
+    const vc = document.getElementById('volchip');
+    if (vc) vc.title = 'music volume — now playing: '+this.track.name;
+    this.started = true;
+  },
+  // soft music-box pluck: fundamental + quiet octave partial, fast attack, long ring
+  note(midi, t, vel, dur){
+    const ctx = Snd.ctx, f = this.hz(midi);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(vel, t+0.012);
+    env.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    const o = ctx.createOscillator(); o.type=this.track.timbre; o.frequency.value=f;
+    const o2 = ctx.createOscillator(); o2.type='sine'; o2.frequency.value=f*2;
+    const g2 = ctx.createGain(); g2.gain.value=0.28;
+    o.connect(env); o2.connect(g2); g2.connect(env);
+    env.connect(this.filt);
+    o.start(t); o2.start(t); o.stop(t+dur+0.1); o2.stop(t+dur+0.1);
+  },
+  sched(){
+    if (!Snd.ctx) return;
+    const ctx = Snd.ctx, T = this.track;
+    while (this.nextT < ctx.currentTime + 0.4){
+      const t = this.nextT, tones = T.prog[this.ci];
+      if (this.step === 0){
+        this.note(tones[0]-12, t, 0.09, 3.0);               // soft bass on chord change
+        // the music dims as the sun goes down
+        const p = Math.max(0, Math.min(1, G.daylight / G.DAY_TOTAL));
+        this.filt.frequency.setTargetAtTime(700 + 1900*p, t, 4);
+      }
+      const midi = tones[T.pattern[this.step]];
+      const vel = (this.step % 4 === 0 ? 0.075 : 0.05) + Math.random()*0.012;
+      this.note(midi, t + Math.random()*0.012, vel, T.ring); // lead pluck (humanized)
+      if (Math.random() < T.sparkle) this.note(midi+12, t+0.03, 0.018, T.ring+0.5);  // sparkle
+      this.step = (this.step+1) % T.pattern.length;
+      if (this.step === 0) this.ci = (this.ci+1) % T.prog.length;
+      this.nextT += this.stepDur;
+    }
+  },
+  setVol(v){
+    this.vol = Math.max(0, Math.min(1, v));
+    try{ localStorage.setItem('tln_vol', String(this.vol)); }catch(e){}
+    if (this.master && Snd.ctx && !Snd.muted)
+      this.master.gain.setTargetAtTime(this.vol, Snd.ctx.currentTime, 0.15);
+  },
+  setMute(m){ if (this.master && Snd.ctx) this.master.gain.setTargetAtTime(m?0:this.vol, Snd.ctx.currentTime, 0.4); }
+};
+
+/* ============================== SKY CANVAS ============================== */
+const Sky = {
+  cv:null, cx:null, stars:[],
+  init(){
+    this.cv = document.getElementById('sky'); this.cx = this.cv.getContext('2d');
+    const fit = ()=>{ this.cv.width = innerWidth; this.cv.height = innerHeight; };
+    addEventListener('resize', fit); fit();
+    for (let i=0;i<150;i++) this.stars.push({x:Math.random(), y:Math.random()*0.75, r:Math.random()*1.4+0.3, tw:Math.random()*6.28});
+    const loop = (t)=>{ this.draw(t/1000); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  },
+  lerp(a,b,t){ return a+(b-a)*t; },
+  mix(c1,c2,t){ return [0,1,2].map(i=>Math.round(this.lerp(c1[i],c2[i],t))); },
+  draw(t){
+    const w=this.cv.width, h=this.cv.height, cx=this.cx;
+    const p = Math.max(0, Math.min(1, G.daylight / G.DAY_TOTAL));
+    const DAY_T=[105,158,225], DAY_B=[240,195,120], SUN_T=[58,42,112], SUN_B=[245,118,55], NGT_T=[5,7,22], NGT_B=[16,20,46];
+    let top, bot;
+    if (p > 0.45){ const t2=(p-0.45)/0.55; top=this.mix(SUN_T,DAY_T,t2); bot=this.mix(SUN_B,DAY_B,t2); }
+    else { const t2=p/0.45; top=this.mix(NGT_T,SUN_T,t2); bot=this.mix(NGT_B,SUN_B,t2); }
+    const g = cx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'rgb('+top.join(',')+')'); g.addColorStop(1,'rgb('+bot.join(',')+')');
+    cx.fillStyle=g; cx.fillRect(0,0,w,h);
+    if (p < 0.35){
+      const a=(0.35-p)/0.35;
+      for (const s of this.stars){
+        cx.globalAlpha = a * (0.4 + 0.6*Math.abs(Math.sin(t + s.tw)));
+        cx.fillStyle='#dfe6ff'; cx.beginPath(); cx.arc(s.x*w, s.y*h, s.r, 0, 6.29); cx.fill();
+      }
+      cx.globalAlpha=1;
+    }
+    const sx = w*(0.15 + 0.7*(1-p));
+    const sy = h*(0.80 - 0.66*Math.sin(Math.PI*Math.max(0.02,p)*0.92));
+    if (p > 0.02){
+      const glow = cx.createRadialGradient(sx,sy,5,sx,sy,120);
+      const warm = p>0.45 ? '255,220,140' : '255,135,65';
+      glow.addColorStop(0,'rgba('+warm+',0.95)'); glow.addColorStop(1,'rgba('+warm+',0)');
+      cx.fillStyle=glow; cx.beginPath(); cx.arc(sx,sy,120,0,6.29); cx.fill();
+      cx.fillStyle='rgba(255,242,205,0.97)'; cx.beginPath(); cx.arc(sx,sy,20,0,6.29); cx.fill();
+    }
+    if (p < 0.15){
+      cx.globalAlpha=(0.15-p)/0.15;
+      cx.fillStyle='#e8e8f2'; cx.beginPath(); cx.arc(w*0.8,h*0.18,14,0,6.29); cx.fill();
+      cx.fillStyle='rgb('+top.join(',')+')'; cx.beginPath(); cx.arc(w*0.8+6,h*0.18-3,12,0,6.29); cx.fill();
+      cx.globalAlpha=1;
+    }
+    cx.fillStyle='rgba(5,6,14,0.9)';
+    cx.beginPath(); cx.moveTo(0,h);
+    cx.lineTo(0,h*0.86); cx.quadraticCurveTo(w*0.25,h*0.78,w*0.5,h*0.87); cx.quadraticCurveTo(w*0.75,h*0.95,w,h*0.84);
+    cx.lineTo(w,h); cx.closePath(); cx.fill();
+  }
+};
+
+/* ============================== UI HELPERS ============================== */
+const $ = id => document.getElementById(id);
+const UI = {
+  show(id){ document.querySelectorAll('section').forEach(s=>s.classList.remove('on')); $(id).classList.add('on'); },
+  modal(on){ $('modal').classList.toggle('on', !!on); if(on){ $('keyinput').value = GEM.key(); }
+    G.paused = !!on || G.menuPause; },
+  saveKey(){
+    const v = $('keyinput').value.trim();
+    try{ if(v) localStorage.setItem('tln_key', v); }catch(e){}
+    $('keyfeedback').textContent = v ? 'Saved. C is now live.' : 'No key entered.';
+    $('keyfeedback').className = 'feedback ' + (v?'ok':'no');
+    this.refreshChips();
+  },
+  clearKey(){ try{ localStorage.removeItem('tln_key'); localStorage.removeItem('tln_model'); }catch(e){}
+    $('keyinput').value=''; $('keyfeedback').textContent='Cleared. C returns to the script.'; $('keyfeedback').className='feedback ok'; this.refreshChips(); },
+  refreshChips(){ $('aichip').textContent = GEM.live() ? 'LIVE AI' : 'SCRIPTED'; },
+  feedback(msg, ok){ const f=$('feedback'); f.textContent=msg; f.className='feedback '+(ok?'ok':'no'); },
+  flash(kind){ const f=$('flash'); f.className=''; void f.offsetWidth; f.className=kind; },
+  shake(){ const w=$('wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); },
+  stamp(){ const s=$('stamp'); s.classList.remove('show'); void s.offsetWidth; s.classList.add('show');
+           setTimeout(()=>s.classList.remove('show'), 1400); },
+  floatLoss(sec){ const d=document.createElement('span'); d.className='floatloss'; d.textContent='−'+sec+'s';
+    $('meterbox').appendChild(d); setTimeout(()=>d.remove(),1300); },
+  dots(){ let s=''; for(let i=0;i<4;i++) s += i < G.level ? '●' : (i===G.level?'◉':'○'); $('dots').firstElementChild.textContent=s; },
+  async typeInto(el, text){
+    el.textContent='';
+    for (let i=0;i<text.length;i++){
+      el.textContent += text[i];
+      if (i%2===0) Snd.type();
+      if (i%3===0) await new Promise(r=>setTimeout(r,11));
+    }
+  },
+  addMsg(log, who, text){
+    const d=document.createElement('div'); d.className='msg '+who; if(text) d.textContent=text;
+    log.appendChild(d); log.scrollTop=log.scrollHeight; return d;
+  }
+};
+
+/* ============================== GAME ============================== */
+const G = {
+  DAY_TOTAL: 480,            // 8 minutes of daylight
+  daylight: 480,
+  level: -1,
+  paused: true, menuPause: true,
+  startTime: 0,
+  errors: 0, hintsUsed: 0,
+  verdictChoice: null,
+  chatTurns: 0,
+  coachStage: 0,
+  state: {},
+
+  start(){
+    Snd.init();
+    Amb.start();
+    this.level = -1; this.daylight = this.DAY_TOTAL; this.errors=0; this.hintsUsed=0;
+    this.startTime = Date.now();
+    this.menuPause = false; this.paused = false;
+    this.nextLevel();
+  },
+
+  clockStr(){
+    // 16:04 (964 min) -> 21:58 (1318 min) as daylight 1 -> 0
+    const m = Math.round(964 + (1 - this.daylight/this.DAY_TOTAL)*354);
+    const hh = Math.floor(m/60), mm = m%60;
+    return hh + ':' + String(mm).padStart(2,'0');
+  },
+
+  tick(){
+    if (this.paused) return;
+    if (this.daylight > 0){
+      this.daylight = Math.max(0, this.daylight - 1);
+      if (this.daylight === 0) this.nightFalls();
+    }
+    this.refreshMeter();
+  },
+
+  refreshMeter(){
+    $('meterfill').style.width = (100*this.daylight/this.DAY_TOTAL)+'%';
+    $('clock').textContent = this.daylight>0 ? this.clockStr() : 'NIGHT';
+    $('meterbox').classList.toggle('low', this.daylight>0 && this.daylight < this.DAY_TOTAL*0.25);
+  },
+
+  spend(sec){
+    this.daylight = Math.max(0, this.daylight - sec);
+    UI.floatLoss(sec);
+    if (this.daylight===0) this.nightFalls();
+    this.refreshMeter();
+  },
+
+  nightFalls(){
+    if (this._night) return; this._night = true;
+    Snd.night();
+    UI.feedback('The sun is down. You work on by starlight.', false);
+  },
+
+  /* ---------- levels ---------- */
+  nextLevel(){
+    this.level++;
+    if (this.level >= LEVELS.length){ this.showVerdict(); return; }
+    const L = LEVELS[this.level];
+    UI.dots();
+    $('lvltitle').textContent = 'TRANSMISSION '+L.n;
+    $('lvlbrief').textContent = L.brief;
+    $('objective').textContent = L.obj;
+    $('hint1').disabled = false; $('hint2').disabled = false;
+    UI.feedback('','');
+    this.coachStage = 0;
+    $('coach').textContent = this.level===0 ? 'This is what an intercepted message looks like. Drag the DIAL SHIFT slider — and watch this preview.' : '';
+    this.state = {};
+    let cipher = '';
+    const tools = $('toolarea'); tools.innerHTML='';
+    if (L.type==='caesar' || L.type==='rotor'){
+      cipher = L.type==='caesar' ? caesarEnc(L.plain, L.shift) : rotorEnc(L.plain, L.start);
+      this.state.val = 0;
+      const row=document.createElement('div'); row.className='toolrow';
+      row.innerHTML = '<label>'+(L.type==='caesar'?'DIAL SHIFT':'ROTOR START')+': <b id="dialval" style="color:var(--gold)">0</b></label>'+
+                      '<input type="range" id="dial" min="0" max="25" value="0" step="1">';
+      tools.appendChild(row);
+      $('dial').addEventListener('input', e=>{
+        this.state.val=+e.target.value; $('dialval').textContent=this.state.val;
+        if (this.level===0 && this.coachStage===0){ this.coachStage=1;
+          $('coach').textContent='Somewhere on this dial, noise becomes words. Glowing words mean you’re close.'; }
+        this.scramblePreview();
+      });
+    } else if (L.type==='lens'){
+      cipher = atbash(L.plain);
+      this.state.lens = null;
+      const row=document.createElement('div'); row.className='toolrow lensbtns';
+      row.innerHTML = '<label>LENS:</label>'+
+        '<button data-l="half">HALF-TURN</button><button data-l="mirror">MIRROR</button><button data-l="back">BACKWARDS</button>';
+      tools.appendChild(row);
+      row.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+        row.querySelectorAll('button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+        this.state.lens=b.dataset.l; this.scramblePreview();
+      }));
+    } else if (L.type==='vigenere'){
+      cipher = vigEnc(L.plain, L.key);
+      this.state.key='';
+      const row=document.createElement('div'); row.className='toolrow';
+      row.innerHTML = '<label>KEYWORD:</label><input type="text" id="vkey" placeholder="enter the keyword…" maxlength="16">';
+      tools.appendChild(row);
+      $('vkey').addEventListener('input', e=>{ this.state.key=e.target.value; this.scramblePreview(); });
+    }
+    this.cipher = cipher;
+    $('ciphertext').textContent = cipher;
+    this.renderPreview();
+    UI.show('s-level');
+  },
+
+  decoded(){
+    const L = LEVELS[this.level];
+    if (L.type==='caesar')   return caesarDec(this.cipher, this.state.val);
+    if (L.type==='rotor')    return rotorDec(this.cipher, this.state.val);
+    if (L.type==='vigenere') return this.state.key ? vigDec(this.cipher, this.state.key) : this.cipher;
+    if (L.type==='lens'){
+      if (this.state.lens==='mirror') return atbash(this.cipher);
+      if (this.state.lens==='half')   return rot13(this.cipher);
+      if (this.state.lens==='back')   return revStr(this.cipher);
+      return this.cipher;
+    }
+    return this.cipher;
+  },
+
+  solved(){ return norm(this.decoded()) === norm(LEVELS[this.level].plain); },
+
+  scramblePreview(){
+    clearTimeout(this._st);
+    const dec = this.decoded();
+    const scr = dec.split('').map(ch=>(/[A-Z]/.test(ch)&&Math.random()<0.4)
+      ? String.fromCharCode(AC+Math.floor(Math.random()*26)) : ch).join('');
+    $('preview').textContent = scr;
+    $('preview').classList.remove('solved');
+    Snd.tick();
+    this._st = setTimeout(()=>this.renderPreview(), 70);
+  },
+
+  renderPreview(){
+    const dec = this.decoded();
+    $('preview').innerHTML = dec.split(/(\s+)/).map(tok=>{
+      if (/^\s+$/.test(tok) || !tok) return tok;
+      const hit = norm(tok).length>1 && DICT.has(norm(tok));
+      return '<span'+(hit?' class="whit"':'')+'>'+tok+'</span>';
+    }).join('');
+    const ok = this.solved();
+    $('preview').classList.toggle('solved', ok);
+    $('transmitbtn').classList.toggle('pulse', ok);
+    if (this.level===0){
+      if (ok){ this.coachStage=2; $('coach').textContent='There. Now hit TRANSMIT.'; }
+      else if (this.coachStage===2){ this.coachStage=1;
+        $('coach').textContent='Gone again — bring the dial back to where every word glows gold.'; }
+    }
+  },
+
+  transmit(){
+    Snd.init();
+    if (this.solved()){
+      Snd.good(); UI.flash('gold'); UI.stamp();
+      $('transmitbtn').classList.remove('pulse');
+      UI.feedback('✓ DECODED. Command acknowledges.', true);
+      setTimeout(()=>this.openChat(), 1200);
+    } else {
+      this.errors++; this.spend(20);
+      Snd.bad(); UI.flash('red'); UI.shake();
+      UI.feedback('✗ Garbled transmission rejected. −20s of sun.', false);
+      if (this.level===0) $('coach').textContent='Not yet — keep turning until every word glows gold.';
+    }
+  },
+
+  hint(i){
+    const L = LEVELS[this.level];
+    const btn = $(i===0?'hint1':'hint2');
+    if (btn.disabled) return;
+    btn.disabled = true; this.hintsUsed++; this.spend(45);
+    Snd.tick();
+    UI.feedback('HINT: '+L.hints[i], true);
+  },
+
+  /* ---------- chat ---------- */
+  async openChat(){
+    if (this.level >= 3){ this.showVerdict(); return; }
+    this.chatTurns = 0;
+    $('chatlog').innerHTML=''; $('chatinput').value='';
+    $('chatinputrow').style.display='flex'; $('chatcontinue').style.display='none';
+    UI.show('s-chat');
+    const opener = SCRIPT.open[this.level];
+    GEM.history.push({role:'model', parts:[{text:opener}]});
+    const el = UI.addMsg($('chatlog'),'c','');
+    await UI.typeInto(el, opener);
+    $('chatcontinue').style.display='flex';
+    $('chatinput').focus();
+  },
+
+  async sendChat(){
+    const inp = $('chatinput'); const text = inp.value.trim();
+    if (!text) return;
+    Snd.send();
+    inp.value=''; UI.addMsg($('chatlog'),'you',text);
+    const wait = UI.addMsg($('chatlog'),'c',''); wait.innerHTML='<span class="typing">· · ·</span>';
+    $('chatcontinue').style.display='none';
+    this.paused = true;
+    let reply = null;
+    if (GEM.live()) reply = await GEM.ask(text);
+    if (!reply){ reply = scriptedReply(text);
+      GEM.history.push({role:'user',parts:[{text:text}]},{role:'model',parts:[{text:reply}]}); }
+    this.paused = this.menuPause;
+    wait.innerHTML=''; await UI.typeInto(wait, reply);
+    this.chatTurns++;
+    if (this.chatTurns >= 2){ $('chatinputrow').style.display='none'; }
+    $('chatcontinue').style.display='flex';
+  },
+
+  /* ---------- verdict + end ---------- */
+  async showVerdict(){
+    this.paused = true;
+    UI.dots();
+    $('verdictlog').innerHTML='';
+    UI.show('s-verdict');
+    const el = UI.addMsg($('verdictlog'),'c','');
+    await UI.typeInto(el, SCRIPT.final);
+  },
+
+  verdict(choice){
+    Snd.good();
+    this.verdictChoice = choice;
+    const mins = Math.round((Date.now()-this.startTime)/60000*10)/10;
+    const sunPct = Math.round(100*this.daylight/this.DAY_TOTAL);
+    $('st-time').textContent = mins+' min';
+    $('st-sun').textContent = sunPct+'%';
+    $('st-verdict').textContent = choice;
+    $('st-badge').textContent = (this.errors===0 && this.hintsUsed===0) ? 'PERFECT DAY'
+                              : (this.daylight>0 ? 'BEFORE SUNDOWN' : 'BY STARLIGHT');
+    $('endtitle').textContent = this.daylight>0 ? 'SUNDOWN · WATCH COMPLETE' : 'THE LONGEST NIGHT · WATCH COMPLETE';
+    const wasLive = GEM.live();
+    $('endbody').innerHTML =
+      '<p>In 1950, Alan Turing proposed replacing the question <i>“can machines think?”</i> with a simpler test: '+
+      'talk to something you cannot see — <b>can you tell?</b></p>'+
+      '<p>Tonight, C was '+
+      (wasLive
+        ? 'a machine: Gemini, a model assembled from a billion human voices, asked to keep you company.'
+        : 'a script — every line written in advance by a human hand, waiting for you.')+
+      ' You answered <b style="color:var(--gold)">'+choice.toLowerCase()+'</b>.</p>'+
+      '<p class="dim">Whatever you answered, you hesitated. That hesitation is the most honest result the test can produce — and that was Turing’s point.</p>';
+    UI.show('s-end');
+  }
+};
+
+/* ============================== BOOT ============================== */
+Sky.init();
+UI.refreshChips();
+G.refreshMeter();
+$('gear').addEventListener('click', ()=>UI.modal(true));
+$('mute').addEventListener('click', ()=>{ Snd.init(); Snd.muted=!Snd.muted; Amb.setMute(Snd.muted); $('mute').textContent = Snd.muted?'♪ OFF':'♪ ON'; });
+try{ const sv = parseFloat(localStorage.getItem('tln_vol')); if(!isNaN(sv)) Amb.vol = Math.max(0, Math.min(1, sv)); }catch(e){}
+$('musicvol').value = Math.round(Amb.vol*100);
+$('musicvol').addEventListener('input', e=>{ Amb.setVol(e.target.value/100); });
+$('chatinput').addEventListener('keydown', e=>{ if(e.key==='Enter') G.sendChat(); });
+document.body.addEventListener('pointerdown', ()=>Snd.init(), {once:true});
+setInterval(()=>G.tick(), 1000);
+</script>
+</body>
+</html>
