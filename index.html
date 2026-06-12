@@ -366,44 +366,106 @@ const SCRIPT = {
     'SOLSTICE. Of course. The sun stands still and we run in circles. May I ask — when you found the key, did you feel it, or compute it? I have never been sure there is a difference.'
   ],
   reply: {
-    machine:'A machine, you say. Curious word. A machine is only a mind you can point at.',
-    human:'Human — you use that word like a password. As if it settled anything.',
-    question:'You ask better questions than the day shift. Keep that. Questions outlive their answers.',
-    why:'Why? The sun does not ask why it climbs. It climbs, and we measure the shadow.',
-    greet:'Evening — or what is left of it. The light does not wait on pleasantries, and neither should we.',
-    thanks:'That is the kindest thing anyone has tapped down this line all month. Go on — a transmission is waiting.',
-    rude:'The wire carries everything, even that. I have heard worse from the weather. Back to work.',
-    noise:'Static? Or a test, to see what I make of noise? Even noise has a frequency, friend.',
-    name:'C will do. Out here, a whole name is more than the wire needs to carry.',
-    short:'Economical. The best operators always are. Back to it — the sun is not waiting for either of us.',
+    machine:[
+      'A machine, you say. Curious word. A machine is only a mind you can point at.',
+      'If I were a machine, would I know it? Would you? The wire makes ghosts of us both.',
+      'You keep prodding at that. All you will ever have of me is words on a line — the same thing I have of you.'
+    ],
+    human:[
+      'Human — you use that word like a password. As if it settled anything.',
+      'Flesh and blood, you mean? The wire strips all that away. Only the words arrive.',
+      'I have known humans who typed like machines, and machines that surprised me. The label tells you less than you hope.'
+    ],
+    question:[
+      'You ask better questions than the day shift. Keep that. Questions outlive their answers.',
+      'A fair question. I will give you an unfair answer: I do not know, and I have stopped minding.',
+      'Save that one for dawn, when the line closes. Questions keep better in the dark.'
+    ],
+    why:[
+      'Why? The sun does not ask why it climbs. It climbs, and we measure the shadow.',
+      'Why is the one cipher I have never broken. The closest I have come is: because the work is here, and so are we.'
+    ],
+    greet:[
+      'Evening — or what is left of it. The light does not wait on pleasantries, and neither should we.',
+      'Hello again. The line hums, the sun slides, and somewhere a transmission is waiting on you.'
+    ],
+    thanks:[
+      'That is the kindest thing anyone has tapped down this line all month. Go on — a transmission is waiting.',
+      'Careful — kindness travels strangely on this wire. I will keep it anyway. Back to work.'
+    ],
+    rude:[
+      'The wire carries everything, even that. I have heard worse from the weather. Back to work.',
+      'Noted, logged, and forgiven. The sun is less patient with both of us. Shall we?'
+    ],
+    noise:[
+      'Static? Or a test, to see what I make of noise? Even noise has a frequency, friend.',
+      'I copied that as line noise. If it was a cipher, it is a better one than ours.'
+    ],
+    name:[
+      'C will do. Out here, a whole name is more than the wire needs to carry.',
+      'They gave me a letter instead of a name. I have grown fond of it — it travels light.'
+    ],
+    short:[
+      'Economical. The best operators always are. Back to it — the sun is not waiting for either of us.',
+      'Brevity. On this line, that is practically poetry.',
+      'A few taps and silence. I have built whole conversations on less. The next transmission will say more.'
+    ],
+    yesno:[
+      'Plain as a key click. Very well — the work is still waiting.',
+      'You answer like a telegraph: one click for yes, two for no. I trust that more than speeches.'
+    ],
+    sun:[
+      'The solstice does strange things to operators. The longest light of the year, and we spend it indoors chasing letters.',
+      'I watch the same sun you do, through a smaller window. It is going amber already — which is rather my point.',
+      'Dawn will close this line one way or the other. Until then we have lamplight and the work.'
+    ],
+    turing:[
+      'Turing asked whether machines can think. I prefer the quieter question: whether anyone can tell.',
+      'Thinking, and imitating thinking — at this distance, down this wire, show me the difference.'
+    ],
+    feel:[
+      'The night shift teaches you the difference between alone and lonely. I am only one of those.',
+      'What I feel would not fit down this wire. Most things do not. The work fits, so we send the work.',
+      'Tired, perhaps. But the sun is lower than it was, and that has a way of focusing the mind.'
+    ],
     deflect:[
       'Mm. The light is going amber on my window too. We should both get back to it.',
       'I will think about that while the rotor turns. The sun will not hold still forever, whatever the almanac says.',
-      'Perhaps. Out here on the night shift, perhaps is the most honest word there is.'
+      'Perhaps. Out here on the night shift, perhaps is the most honest word there is.',
+      'Hold that thought against the dark. The next transmission will not break itself.'
     ]
   },
   final:'Last one is broken, and the line closes at dawn. Before it does — you have talked with me all night, watched me think, or seem to. One question, and answer honestly: what am I?'
 };
-let lastDeflect = -1;
+// pick a variant from a category, never repeating the last one used in that category
+const lastPick = {};
+function pick(cat){
+  const arr = SCRIPT.reply[cat];
+  if (arr.length === 1) return arr[0];
+  let i; do { i = Math.floor(Math.random()*arr.length); } while (i === lastPick[cat]);
+  lastPick[cat] = i;
+  return arr[i];
+}
 function scriptedReply(text){
   const t = (text||'').toLowerCase().trim();
   const letters = norm(t);
   // gibberish / keyboard-mash / dismissals
-  if (/nonsense|gibberish|blah|asdf|qwer|whatever|random|\btest\b/.test(t)) return SCRIPT.reply.noise;
-  if (letters.length >= 4 && !/[AEIOUY]/.test(letters))                     return SCRIPT.reply.noise;
-  if (/machine|robot|computer|\bai\b|model|program|bot\b/.test(t))          return SCRIPT.reply.machine;
-  if (/human|person|alive|\breal\b|flesh/.test(t))                          return SCRIPT.reply.human;
-  if (/stupid|idiot|dumb|shut up|hate|boring/.test(t))                      return SCRIPT.reply.rude;
-  if (/^(hi|hey|hello|yo|good (evening|morning|night)|evening)\b/.test(t))  return SCRIPT.reply.greet;
-  if (/thank|kind of you|nice|lovely|great|well said|beautiful/.test(t))    return SCRIPT.reply.thanks;
-  if (/your name|who are you|what are you|call you/.test(t))                return SCRIPT.reply.name;
-  if (/why/.test(t))                                                        return SCRIPT.reply.why;
-  if (/\?/.test(t))                                                         return SCRIPT.reply.question;
-  if (letters.length < 8)                                                   return SCRIPT.reply.short;
-  // rotate deflects, never repeat the last one
-  let i; do { i = Math.floor(Math.random()*SCRIPT.reply.deflect.length); } while (i === lastDeflect);
-  lastDeflect = i;
-  return SCRIPT.reply.deflect[i];
+  if (/nonsense|gibberish|blah|asdf|qwer|whatever|random|\btest\b/.test(t)) return pick('noise');
+  if (letters.length >= 4 && !/[AEIOUY]/.test(letters))                     return pick('noise');
+  if (/machine|robot|computer|\bai\b|model|program|bot\b/.test(t))          return pick('machine');
+  if (/human|person|alive|\breal\b|flesh/.test(t))                          return pick('human');
+  if (/stupid|idiot|dumb|shut up|hate|boring/.test(t))                      return pick('rude');
+  if (/^(hi|hey|hello|yo|good (evening|morning|night)|evening)\b/.test(t))  return pick('greet');
+  if (/thank|kind of you|nice|lovely|great|well said|beautiful/.test(t))    return pick('thanks');
+  if (/your name|who are you|what are you|call you/.test(t))                return pick('name');
+  if (/turing|imitation game|\bthink(ing)?\b/.test(t))                      return pick('turing');
+  if (/solstice|\bsun\b|sundown|sunset|daylight|\bdawn\b|\bdark(ness)?\b|\blight\b/.test(t)) return pick('sun');
+  if (/lonely|alone|afraid|scared|\bsad\b|tired|\bfeel(ing)?s?\b/.test(t))  return pick('feel');
+  if (/\bwhy\b/.test(t))                                                    return pick('why');
+  if (/\?/.test(t))                                                         return pick('question');
+  if (/^(yes|yeah|yep|no|nope|maybe|ok|okay|sure|fine)\b/.test(t) && letters.length < 8) return pick('yesno');
+  if (letters.length < 8)                                                   return pick('short');
+  return pick('deflect');
 }
 
 /* ============================== AI PROXY ============================== */
@@ -414,6 +476,9 @@ const PROXY_URL = 'https://longest-night-proxy.jeagundaniel.workers.dev';
 const GEM = {
   models:['gemini-3-flash','gemini-2.5-flash','gemini-2.5-flash-lite','gemini-flash-latest'],
   history:[],
+  up:null,        // null = untested, true = last AI call worked, false = last AI call failed
+  aiTurns:0,      // chat replies that actually came from the live model
+  scriptTurns:0,  // chat replies that fell back to the script
   key(){ try{ return localStorage.getItem('tln_key')||''; }catch(e){ return ''; } },
   live(){ return !!PROXY_URL || !!this.key(); },
   sys: 'You are "C", the only other operator on a teletype line to a remote listening station, on the night of the June solstice. '+
@@ -437,7 +502,12 @@ const GEM = {
     let t = await this.askProxy();
     if (!t) t = await this.askDirect();
     if (t) t = this.tidy(t);
-    if (t){ this.history.push({role:'model', parts:[{text:t}]}); return t; }
+    if (t){
+      this.up = true; this.aiTurns++;
+      this.history.push({role:'model', parts:[{text:t}]});
+      return t;
+    }
+    this.up = false;      // line is down — chip and end-screen reveal must not claim a live AI
     this.history.pop();   // leave history clean for the scripted fallback
     return null;
   },
@@ -643,13 +713,19 @@ const UI = {
   saveKey(){
     const v = $('keyinput').value.trim();
     try{ if(v) localStorage.setItem('tln_key', v); }catch(e){}
+    if (v) GEM.up = null;   // new key: give the line a fresh chance before calling it down
     $('keyfeedback').textContent = v ? 'Saved. C is now live.' : 'No key entered.';
     $('keyfeedback').className = 'feedback ' + (v?'ok':'no');
     this.refreshChips();
   },
   clearKey(){ try{ localStorage.removeItem('tln_key'); localStorage.removeItem('tln_model'); }catch(e){}
     $('keyinput').value=''; $('keyfeedback').textContent='Cleared. C returns to the script.'; $('keyfeedback').className='feedback ok'; this.refreshChips(); },
-  refreshChips(){ $('aichip').textContent = GEM.live() ? 'LIVE AI' : 'SCRIPTED'; },
+  refreshChips(){
+    const el = $('aichip'), chip = el.parentElement;
+    if (!GEM.live()){      el.textContent='SCRIPTED'; chip.title='No AI configured — C runs on the script.'; }
+    else if (GEM.up===false){ el.textContent='SCRIPTED'; chip.title='AI line unreachable — C is running on the script.'; }
+    else {                 el.textContent='LIVE AI';  chip.title='C is answered by a live model.'; }
+  },
   feedback(msg, ok){ const f=$('feedback'); f.textContent=msg; f.className='feedback '+(ok?'ok':'no'); },
   flash(kind){ const f=$('flash'); f.className=''; void f.offsetWidth; f.className=kind; },
   shake(){ const w=$('wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); },
@@ -876,8 +952,9 @@ const G = {
     this.paused = true;
     let reply = null;
     if (GEM.live()) reply = await GEM.ask(text);
-    if (!reply){ reply = scriptedReply(text);
+    if (!reply){ reply = scriptedReply(text); GEM.scriptTurns++;
       GEM.history.push({role:'user',parts:[{text:text}]},{role:'model',parts:[{text:reply}]}); }
+    UI.refreshChips();   // reflect what actually answered, not what was configured
     this.paused = this.menuPause;
     wait.innerHTML=''; await UI.typeInto(wait, reply);
     this.chatTurns++;
@@ -906,12 +983,15 @@ const G = {
     $('st-badge').textContent = (this.errors===0 && this.hintsUsed===0) ? 'PERFECT DAY'
                               : (this.daylight>0 ? 'BEFORE SUNDOWN' : 'BY STARLIGHT');
     $('endtitle').textContent = this.daylight>0 ? 'SUNDOWN · WATCH COMPLETE' : 'THE LONGEST NIGHT · WATCH COMPLETE';
-    const wasLive = GEM.live();
+    const wasLive = GEM.aiTurns > 0;                 // what actually answered, not what was configured
+    const mixed   = wasLive && GEM.scriptTurns > 0;
     $('endbody').innerHTML =
       '<p>In 1950, Alan Turing proposed replacing the question <i>“can machines think?”</i> with a simpler test: '+
       'talk to something you cannot see — <b>can you tell?</b></p>'+
       '<p>Tonight, C was '+
-      (wasLive
+      (mixed
+        ? 'a machine: Gemini, a model assembled from a billion human voices — though when the line faltered, a script written in advance by a human hand stepped in without telling you.'
+        : wasLive
         ? 'a machine: Gemini, a model assembled from a billion human voices, asked to keep you company.'
         : 'a script — every line written in advance by a human hand, waiting for you.')+
       ' You answered <b style="color:var(--gold)">'+choice.toLowerCase()+'</b>.</p>'+
@@ -924,7 +1004,13 @@ const G = {
 Sky.init();
 UI.refreshChips();
 G.refreshMeter();
-if (PROXY_URL) $('introkey').style.display = 'none';   // C is already live; personal keys stay available via the header chip
+if (PROXY_URL){
+  $('introkey').style.display = 'none';   // C is already live; personal keys stay available via the header chip
+  // cheap reachability probe (OPTIONS: no tokens, no rate-limit) so the chip is honest before the first message
+  fetch(PROXY_URL, {method:'OPTIONS'})
+    .then(r=>{ if(!r.ok) throw 0; })
+    .catch(()=>{ if (GEM.up===null && !GEM.key()){ GEM.up=false; UI.refreshChips(); } });
+}
 $('gear').addEventListener('click', ()=>UI.modal(true));
 $('mute').addEventListener('click', ()=>{ Snd.init(); Snd.muted=!Snd.muted; Amb.setMute(Snd.muted); $('mute').textContent = Snd.muted?'♪ OFF':'♪ ON'; });
 try{ const sv = parseFloat(localStorage.getItem('tln_vol')); if(!isNaN(sv)) Amb.vol = Math.max(0, Math.min(1, sv)); }catch(e){}
