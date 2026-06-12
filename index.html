@@ -334,7 +334,7 @@ const LEVELS = [
            'Try a shift equal to the number of days in a week.'] },
   { n:'TWO', type:'lens', lens:'mirror',
     plain:'AT MIDNIGHT EVEN THE MACHINE DREAMS OF LIGHT',
-    brief:'The alphabet has been reflected somehow.',
+    brief:'The message has been turned around somehow — and there is more than one way to turn a thing around.',
     obj:'OBJECTIVE: one of the three lenses will read it. Choose.',
     hints:['Hold the alphabet up to a mirror: the first letter trades places with the last.',
            'A becomes Z. B becomes Y. Pick the MIRROR.'] },
@@ -351,6 +351,40 @@ const LEVELS = [
     hints:['Each letter is shifted one more than the letter before it.',
            'The first letter was shifted by the number of sides on a triangle.'] },
 ];
+
+/* ============================== PER-PLAYTHROUGH RANDOMIZATION ============================== */
+// In-character riddles for every number the dial/rotor puzzles can draw,
+// so hint 2 always names the answer without breaking voice.
+const RIDDLE = {
+  3:'the number of sides on a triangle',
+  4:'the number of transmissions that arrived at noon',
+  5:'the number of fingers on an operator’s hand',
+  6:'the number of legs on an insect',
+  7:'the number of days in a week',
+  8:'the number of letters in SOLSTICE',
+  9:'the number of lives a cat is said to have',
+  10:'the number of fingers on two hands',
+  12:'the number of months in a year',
+  13:'the number superstitious hotels leave off their doors',
+  14:'the number of days in a fortnight',
+  15:'the number of minutes in a quarter hour',
+  16:'the number of ounces in a pound',
+  18:'the number of holes on a golf course',
+  20:'all your fingers and all your toes, counted together',
+  21:'today’s date — the twenty-first of June',
+  24:'the number of hours in a day',
+  25:'the number of years in a quarter century'
+};
+const RIDDLE_KEYS = Object.keys(RIDDLE).map(Number);
+// Hint pairs for whichever lens transformation level TWO draws
+const LENS_HINTS = {
+  mirror:['Hold the alphabet up to a mirror: the first letter trades places with the last.',
+          'A becomes Z. B becomes Y. Pick the MIRROR.'],
+  half:  ['The alphabet has been spun half a turn — the first letter now wears the fourteenth’s coat.',
+          'A becomes N. N becomes A. Pick the HALF-TURN.'],
+  back:  ['Nothing has been replaced — only rearranged. Try reading from the wrong end.',
+          'The last letter belongs first. Pick BACKWARDS.']
+};
 
 /* dictionary for the "glowing words" warm-feedback */
 const DICT = new Set(('THE SUN STANDS STILL TODAY BUT WE DO NOT AT MIDNIGHT EVEN MACHINE DREAMS OF LIGHT CAN '+
@@ -761,9 +795,26 @@ const G = {
   coachStage: 0,
   state: {},
 
+  // Fresh answers every watch: random dial shift, rotor start, and lens — with matching hints.
+  // The vigenère keyword stays SOLSTICE: its clue is narrative, not numeric.
+  randomizeLevels(){
+    const pool = RIDDLE_KEYS.slice();
+    const draw = ()=>pool.splice(Math.floor(Math.random()*pool.length),1)[0];  // without replacement
+    const L1 = LEVELS[0], L2 = LEVELS[1], L4 = LEVELS[3];
+    L1.shift = draw();
+    L1.hints = ['Caesar shifted every letter of his orders by the same fixed amount.',
+                'Try a shift equal to '+RIDDLE[L1.shift]+'.'];
+    L4.start = draw();
+    L4.hints = ['Each letter is shifted one more than the letter before it.',
+                'The first letter was shifted by '+RIDDLE[L4.start]+'.'];
+    L2.lens = ['mirror','half','back'][Math.floor(Math.random()*3)];
+    L2.hints = LENS_HINTS[L2.lens];
+  },
+
   start(){
     Snd.init();
     Amb.start();
+    this.randomizeLevels();
     this.level = -1; this.daylight = this.DAY_TOTAL; this.errors=0; this.hintsUsed=0;
     this.startTime = Date.now();
     this.menuPause = false; this.paused = false;
@@ -835,7 +886,7 @@ const G = {
         this.scramblePreview();
       });
     } else if (L.type==='lens'){
-      cipher = atbash(L.plain);
+      cipher = L.lens==='half' ? rot13(L.plain) : L.lens==='back' ? revStr(L.plain) : atbash(L.plain);
       this.state.lens = null;
       const row=document.createElement('div'); row.className='toolrow lensbtns';
       row.innerHTML = '<label>LENS:</label>'+

@@ -9,7 +9,7 @@ You are the night-shift cryptanalyst at a remote listening station on June 21. F
 ## The mechanics
 
 - **Daylight is your resource.** It drains in real time (~8 minutes of sun). Wrong transmissions cost 20s, hints cost 45s. If the sun sets, you finish by starlight — the ending remembers.
-- **Four ciphers, rising difficulty:** Caesar shift → Atbash mirror → Vigenère (find the keyword from narrative clues) → rotor cipher (progressive shift, an Enigma nod).
+- **Four ciphers, rising difficulty:** Caesar shift → lens cipher (mirror, half-turn, or backwards) → Vigenère (find the keyword from narrative clues) → rotor cipher (progressive shift, an Enigma nod). The dial shift, lens, and rotor start are drawn fresh every watch, and the hints adapt to whatever was drawn.
 - **The Turing Test, playable.** C chats with you between levels and never says what it is. At the end, you decide.
 - **A score that follows the sun.** The procedural soundtrack (one of three tracks, picked per visit) dims in tone as daylight fades. Music volume is adjustable independently of the game's sound effects.
 
