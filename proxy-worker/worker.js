@@ -86,8 +86,7 @@ export default {
     // ---- call Gemini (persona + caps enforced server-side) ----
     // Newer Flash models "think" by default and bill those hidden tokens against
     // maxOutputTokens, so a modest cap can return an EMPTY reply (budget spent
-    // thinking). That silently broke this proxy when gemini-3-flash shipped.
-    // Fix: switch thinking off (2.5) or to its lowest level (3.x+) per model,
+    // thinking). Switch thinking off (2.5) or to its lowest level (3.x+) per model,
     // and keep enough room for the actual answer.
     const genConfig = (model) => {
       const cfg = { maxOutputTokens: 1024, temperature: 0.9 };
@@ -97,6 +96,8 @@ export default {
       return cfg;
     };
 
+    // Diagnostics: capture WHY every model failed, so a blank 502 becomes legible.
+    let lastStatus = 0, lastDetail = '';
     for (const model of MODELS) {
       try {
         const payload = JSON.stringify({
@@ -112,15 +113,21 @@ export default {
           body: payload,
         });
         if (!r.ok) {
+          lastStatus = r.status;
+          try { lastDetail = (await r.text()).replace(/\s+/g, ' ').slice(0, 300); } catch {}
           if (r.status === 404 || r.status === 400) continue;  // model/param unsupported -> try next
           break;                                               // quota/auth problem -> give up
         }
         const j = await r.json();
         const text = tidy((j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
         if (text) return json({ text, model }, 200, h);
-        // 200 but empty (a model ignored the cap and thought anyway) -> try next
-      } catch { break; }
+        lastStatus = 200; lastDetail = 'HTTP 200 but no text (finishReason likely MAX_TOKENS / thinking)';
+      } catch (e) {
+        lastStatus = -1; lastDetail = String((e && e.message) || e).slice(0, 200);
+        break;
+      }
     }
-    return json({ error: 'upstream unavailable' }, 502, h);
+    // Temporary: expose the real upstream reason (key vs quota vs param). Remove once fixed.
+    return json({ error: 'upstream unavailable', upstreamStatus: lastStatus, upstreamDetail: lastDetail }, 502, h);
   },
 };
