@@ -9,7 +9,7 @@
  * Gates:
  *  - Origin allowlist (env.ALLOWED_ORIGINS, comma-separated; empty = allow all)
  *  - Per-IP sliding-window rate limit (in-memory per isolate)
- *  - Input caps (max 14 messages, 400 chars each); 300-token output cap
+ *  - Input caps (max 14 messages, 400 chars each); 1024-token output cap
  *
  * Config: GEMINI_API_KEY (secret), ALLOWED_ORIGINS (plaintext var)
  */
@@ -84,25 +84,41 @@ export default {
       return json({ error: 'last message must be from user' }, 400, h);
 
     // ---- call Gemini (persona + caps enforced server-side) ----
-    const payload = JSON.stringify({
-      system_instruction: { parts: [{ text: SYS }] },
-      contents,
-      generationConfig: { maxOutputTokens: 2048, temperature: 0.9 },  // thinking models spend tokens reasoning before replying
-    });
+    // Newer Flash models "think" by default and bill those hidden tokens against
+    // maxOutputTokens, so a modest cap can return an EMPTY reply (budget spent
+    // thinking). That silently broke this proxy when gemini-3-flash shipped.
+    // Fix: switch thinking off (2.5) or to its lowest level (3.x+) per model,
+    // and keep enough room for the actual answer.
+    const genConfig = (model) => {
+      const cfg = { maxOutputTokens: 1024, temperature: 0.9 };
+      cfg.thinkingConfig = /gemini-(3|4|5|6|7|8|9)/.test(model)
+        ? { thinkingLevel: 'low' }   // 3.x+: can't fully disable; keep it minimal
+        : { thinkingBudget: 0 };     // 2.5.x: 0 turns thinking off
+      return cfg;
+    };
 
     for (const model of MODELS) {
       try {
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }
-        );
+        const payload = JSON.stringify({
+          system_instruction: { parts: [{ text: SYS }] },
+          contents,
+          generationConfig: genConfig(model),
+        });
+        const url = 'https://generativelanguage.googleapis.com/v1beta/models/'
+          + model + ':generateContent?key=' + env.GEMINI_API_KEY;
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        });
         if (!r.ok) {
-          if (r.status === 404 || r.status === 400) continue;  // model unavailable -> try next
+          if (r.status === 404 || r.status === 400) continue;  // model/param unsupported -> try next
           break;                                               // quota/auth problem -> give up
         }
         const j = await r.json();
         const text = tidy((j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
         if (text) return json({ text, model }, 200, h);
+        // 200 but empty (a model ignored the cap and thought anyway) -> try next
       } catch { break; }
     }
     return json({ error: 'upstream unavailable' }, 502, h);
