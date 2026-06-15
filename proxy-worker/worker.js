@@ -96,7 +96,8 @@ export default {
       return cfg;
     };
 
-    // Diagnostics: capture WHY every model failed, so a blank 502 becomes legible.
+    // Track why models fail; logged to the Worker console (wrangler tail / dashboard
+    // logs) for diagnosis, but never returned to the player.
     let lastStatus = 0, lastDetail = '';
     for (const model of MODELS) {
       try {
@@ -127,7 +128,7 @@ export default {
         break;
       }
     }
-    // Temporary: expose the real upstream reason (key vs quota vs param). Remove once fixed.
-    return json({ error: 'upstream unavailable', upstreamStatus: lastStatus, upstreamDetail: lastDetail }, 502, h);
+    console.warn('[C proxy] all models failed:', lastStatus, lastDetail);  // visible in Worker logs only
+    return json({ error: 'upstream unavailable' }, 502, h);
   },
 };

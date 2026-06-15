@@ -1040,20 +1040,23 @@ const G = {
     $('st-time').textContent = mins+' min';
     $('st-sun').textContent = sunPct+'%';
     $('st-verdict').textContent = choice;
-    $('st-badge').textContent = (this.errors===0 && this.hintsUsed===0) ? 'PERFECT DAY'
+    $('st-badge').textContent = (this.errors===0 && this.hintsUsed===0 && this.daylight>0) ? 'PERFECT DAY'
                               : (this.daylight>0 ? 'BEFORE SUNDOWN' : 'BY STARLIGHT');
     $('endtitle').textContent = this.daylight>0 ? 'SUNDOWN · WATCH COMPLETE' : 'THE LONGEST NIGHT · WATCH COMPLETE';
     const wasLive = GEM.aiTurns > 0;                 // what actually answered, not what was configured
     const mixed   = wasLive && GEM.scriptTurns > 0;
-    $('endbody').innerHTML =
-      '<p>In 1950, Alan Turing proposed replacing the question <i>“can machines think?”</i> with a simpler test: '+
-      'talk to something you cannot see — <b>can you tell?</b></p>'+
-      '<p>Tonight, C was '+
-      (mixed
+    const silent  = GEM.aiTurns===0 && GEM.scriptTurns===0;   // never exchanged a line with C
+    const disclosure = silent
+      ? 'you never spoke to C — the line stayed silent all night, and you judged it on silence alone.'
+      : 'C was '+(mixed
         ? 'a machine: Gemini, a model assembled from a billion human voices — though when the line faltered, a script written in advance by a human hand stepped in without telling you.'
         : wasLive
         ? 'a machine: Gemini, a model assembled from a billion human voices, asked to keep you company.'
-        : 'a script — every line written in advance by a human hand, waiting for you.')+
+        : 'a script — every line written in advance by a human hand, waiting for you.');
+    $('endbody').innerHTML =
+      '<p>In 1950, Alan Turing proposed replacing the question <i>“can machines think?”</i> with a simpler test: '+
+      'talk to something you cannot see — <b>can you tell?</b></p>'+
+      '<p>Tonight, '+disclosure+
       ' You answered <b style="color:var(--gold)">'+choice.toLowerCase()+'</b>.</p>'+
       '<p class="dim">Whatever you answered, you hesitated. That hesitation is the most honest result the test can produce — and that was Turing’s point.</p>';
     UI.show('s-end');
